@@ -1,0 +1,17 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="hud-root" class="hud-root">
+        <ui:VisualElement name="checklist-panel" class="checklist-panel">
+            <ui:Label name="checklist-title" text="LOTO Checklist" class="title" />
+            <ui:Label name="step-open-switch-box" text="Open switch box" class="step" />
+            <ui:Label name="step-turn-power-off" text="Turn power OFF" class="step" />
+            <ui:Label name="step-wait-shutdown" text="Wait for shutdown" class="step" />
+            <ui:Label name="step-close-switch-box" text="Close switch box" class="step" />
+            <ui:Label name="step-apply-lock" text="Apply lock" class="step" />
+            <ui:Label name="step-apply-tag" text="Apply warning tag" class="step" />
+            <ui:Label name="step-open-service-door" text="Open service door" class="step" />
+        </ui:VisualElement>
+        <ui:VisualElement name="warning-panel" class="warning-panel">
+            <ui:Label name="warning-message" text="" class="warning-message" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
