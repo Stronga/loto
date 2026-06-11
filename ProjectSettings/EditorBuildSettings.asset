@@ -5,16 +5,19 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/loto.unity
     guid: 6d43e46d8a4327e4a865b9018c467a0f
   - enabled: 1
+    path: Assets/Scenes/LOTO_AR.unity
+    guid: 0edeb52a50d54612b0ca1b47475d38d7
+  - enabled: 0
     path: Assets/Scenes/new.unity
     guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/LOTO_Generator_Training.unity
     guid: dc87647514beff44b9ea8956ae1e2a3b
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/main.unity
     guid: a36a8eaf20bb3a44486661656c194501
   m_configObjects:

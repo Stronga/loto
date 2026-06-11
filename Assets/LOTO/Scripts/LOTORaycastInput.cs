@@ -51,12 +51,22 @@ public class LOTORaycastInput : MonoBehaviour
         }
 
         Ray ray = targetCamera.ScreenPointToRay(screenPosition);
+        return TriggerRaycast(ray);
+    }
+
+    public bool TriggerAtRay(Ray ray)
+    {
+        return TriggerRaycast(ray);
+    }
+
+    private bool TriggerRaycast(Ray ray)
+    {
         RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, interactionMask, QueryTriggerInteraction.Collide);
         if (hits == null || hits.Length == 0)
         {
             if (debugHits)
             {
-                Debug.Log($"LOTORaycastInput missed at screen position {screenPosition}.");
+                Debug.Log($"LOTORaycastInput missed from ray origin {ray.origin}.");
             }
 
             return false;
@@ -82,7 +92,7 @@ public class LOTORaycastInput : MonoBehaviour
 
                 if (IsCurrentAction(clickable.actionType, clickable.stateController))
                 {
-                    LogHit(hit, clickable.actionType, true);
+                    LogTrigger(hit, clickable.actionType, true, "clickable");
                     clickable.TriggerAction();
                     return true;
                 }
@@ -101,7 +111,7 @@ public class LOTORaycastInput : MonoBehaviour
 
                 if (IsCurrentAction(snapObject.notifyAction, snapObject.stateController))
                 {
-                    LogHit(hit, snapObject.notifyAction, true);
+                    LogTrigger(hit, snapObject.notifyAction, true, "snap object");
                     snapObject.TriggerSnap();
                     return true;
                 }
@@ -110,14 +120,14 @@ public class LOTORaycastInput : MonoBehaviour
 
         if (fallbackClickable != null)
         {
-            LogHit(fallbackHit, fallbackClickable.actionType, false);
+            LogTrigger(fallbackHit, fallbackClickable.actionType, false, "clickable");
             fallbackClickable.TriggerAction();
             return true;
         }
 
         if (fallbackSnapObject != null)
         {
-            LogHit(fallbackHit, fallbackSnapObject.notifyAction, false);
+            LogTrigger(fallbackHit, fallbackSnapObject.notifyAction, false, "snap object");
             fallbackSnapObject.TriggerSnap();
             return true;
         }
@@ -136,7 +146,7 @@ public class LOTORaycastInput : MonoBehaviour
         return controller != null && controller.IsCurrentAction(actionType);
     }
 
-    private void LogHit(RaycastHit hit, LOTOActionType actionType, bool currentAction)
+    private void LogTrigger(RaycastHit hit, LOTOActionType actionType, bool currentAction, string targetType)
     {
         if (!debugHits)
         {
@@ -144,7 +154,7 @@ public class LOTORaycastInput : MonoBehaviour
         }
 
         string priority = currentAction ? "current step" : "fallback";
-        Debug.Log($"LOTORaycastInput hit {hit.collider.name} for {actionType} ({priority}).");
+        Debug.Log($"LOTORaycastInput triggered {targetType} '{hit.collider.name}' for {actionType} ({priority}).");
     }
 
     private bool TryGetPointerDownPosition(out Vector2 screenPosition)

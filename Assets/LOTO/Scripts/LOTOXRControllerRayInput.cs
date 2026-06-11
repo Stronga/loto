@@ -1,0 +1,406 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.XR;
+
+public class LOTOXRControllerRayInput : MonoBehaviour
+{
+    public LOTORaycastInput raycastInput;
+    public Transform rightRayOrigin;
+    public Transform leftRayOrigin;
+    public bool useRightController = true;
+    public bool useLeftController = true;
+    public bool debugLogs = true;
+    public bool drawDebugRays = true;
+    public float debugRayLength = 10f;
+    public LineRenderer rayLine;
+    public float rayLength = 10f;
+    public float rayWidth = 0.01f;
+    public Color normalColor = Color.white;
+    public Color hitColor = Color.green;
+    public Color missColor = Color.red;
+    public Transform hitReticle;
+
+    private readonly List<InputDevice> devices = new List<InputDevice>();
+    private bool rightWasPressed;
+    private bool leftWasPressed;
+    private bool loggedMissingRaycastInput;
+    private bool loggedMissingRightOrigin;
+    private bool loggedMissingLeftOrigin;
+    private bool loggedMissingRightDevice;
+    private bool loggedMissingLeftDevice;
+    private bool loggedRayVisualActive;
+    private Collider lastRayHitCollider;
+    private bool lastRayHitWasUseful;
+
+    private void Awake()
+    {
+        if (raycastInput == null)
+        {
+#if UNITY_2023_1_OR_NEWER
+            raycastInput = FindFirstObjectByType<LOTORaycastInput>();
+#else
+            raycastInput = FindObjectOfType<LOTORaycastInput>();
+#endif
+        }
+
+        EnsureRayLine();
+    }
+
+    private void Update()
+    {
+        if (raycastInput == null)
+        {
+            LogOnce(ref loggedMissingRaycastInput, "LOTOXRControllerRayInput has no LOTORaycastInput assigned.");
+            return;
+        }
+
+        UpdateVisibleRay(GetActiveRayOrigin());
+
+        if (useRightController)
+        {
+            HandleController(
+                InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Right,
+                rightRayOrigin,
+                ref rightWasPressed,
+                "right",
+                ref loggedMissingRightOrigin,
+                ref loggedMissingRightDevice);
+        }
+
+        if (useLeftController)
+        {
+            HandleController(
+                InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Left,
+                leftRayOrigin,
+                ref leftWasPressed,
+                "left",
+                ref loggedMissingLeftOrigin,
+                ref loggedMissingLeftDevice);
+        }
+    }
+
+    private void HandleController(
+        InputDeviceCharacteristics characteristics,
+        Transform rayOrigin,
+        ref bool wasPressed,
+        string controllerName,
+        ref bool loggedMissingOrigin,
+        ref bool loggedMissingDevice)
+    {
+        if (rayOrigin == null)
+        {
+            LogOnce(ref loggedMissingOrigin, $"LOTOXRControllerRayInput has no {controllerName} ray origin assigned.");
+            return;
+        }
+
+        if (drawDebugRays)
+        {
+            Debug.DrawRay(rayOrigin.position, rayOrigin.forward * debugRayLength, Color.green);
+        }
+
+        bool isPressed = IsSelectPressed(characteristics, controllerName, ref loggedMissingDevice);
+        if (isPressed && !wasPressed)
+        {
+            Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
+            Log($"LOTOXRControllerRayInput {controllerName} trigger pressed.");
+            bool didTrigger = raycastInput.TriggerAtRay(ray);
+            Log($"LOTOXRControllerRayInput TriggerAtRay returned {didTrigger} for {controllerName} controller.");
+        }
+
+        wasPressed = isPressed;
+    }
+
+    private bool IsSelectPressed(InputDeviceCharacteristics characteristics, string controllerName, ref bool loggedMissingDevice)
+    {
+        devices.Clear();
+        InputDevices.GetDevicesWithCharacteristics(characteristics, devices);
+
+        if (devices.Count == 0)
+        {
+            LogOnce(ref loggedMissingDevice, $"LOTOXRControllerRayInput found no {controllerName} controller devices for {characteristics}.");
+            return false;
+        }
+
+        loggedMissingDevice = false;
+
+        for (int i = 0; i < devices.Count; i++)
+        {
+            InputDevice device = devices[i];
+            if (!device.isValid)
+            {
+                continue;
+            }
+
+            if (device.TryGetFeatureValue(CommonUsages.triggerButton, out bool triggerPressed) && triggerPressed)
+            {
+                return true;
+            }
+
+            if (device.TryGetFeatureValue(CommonUsages.primaryButton, out bool primaryPressed) && primaryPressed)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private Transform GetActiveRayOrigin()
+    {
+        InputDeviceCharacteristics rightCharacteristics =
+            InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Right;
+        InputDeviceCharacteristics leftCharacteristics =
+            InputDeviceCharacteristics.Controller | InputDeviceCharacteristics.HeldInHand | InputDeviceCharacteristics.Left;
+
+        if (useRightController && rightRayOrigin != null && HasControllerDevice(rightCharacteristics))
+        {
+            return rightRayOrigin;
+        }
+
+        if (useLeftController && leftRayOrigin != null && HasControllerDevice(leftCharacteristics))
+        {
+            return leftRayOrigin;
+        }
+
+        if (useRightController && rightRayOrigin != null)
+        {
+            return rightRayOrigin;
+        }
+
+        if (useLeftController && leftRayOrigin != null)
+        {
+            return leftRayOrigin;
+        }
+
+        return null;
+    }
+
+    private bool HasControllerDevice(InputDeviceCharacteristics characteristics)
+    {
+        devices.Clear();
+        InputDevices.GetDevicesWithCharacteristics(characteristics, devices);
+
+        for (int i = 0; i < devices.Count; i++)
+        {
+            if (devices[i].isValid)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void EnsureRayLine()
+    {
+        if (rayLine == null)
+        {
+            GameObject lineObject = new GameObject("LOTO Visible Controller Ray");
+            lineObject.transform.SetParent(transform, false);
+            rayLine = lineObject.AddComponent<LineRenderer>();
+        }
+
+        rayLine.positionCount = 2;
+        rayLine.useWorldSpace = true;
+        rayLine.widthMultiplier = rayWidth;
+        rayLine.numCapVertices = 4;
+        rayLine.enabled = false;
+
+        if (rayLine.sharedMaterial == null)
+        {
+            rayLine.sharedMaterial = CreateRayMaterial();
+        }
+
+        SetRayColor(normalColor);
+        LogOnce(ref loggedRayVisualActive, "LOTOXRControllerRayInput ray visual active.");
+    }
+
+    private static Material CreateRayMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Sprites/Default");
+        }
+
+        if (shader == null)
+        {
+            shader = Shader.Find("Hidden/Internal-Colored");
+        }
+
+        if (shader == null)
+        {
+            Debug.LogWarning("LOTOXRControllerRayInput could not find an unlit shader for the visible ray.");
+            return null;
+        }
+
+        Material material = new Material(shader);
+        material.name = "LOTO Controller Ray Material";
+        return material;
+    }
+
+    private void UpdateVisibleRay(Transform rayOrigin)
+    {
+        EnsureRayLine();
+
+        if (rayOrigin == null)
+        {
+            SetRayVisible(false);
+            SetReticleVisible(false);
+            return;
+        }
+
+        Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
+        RaycastHit[] hits = Physics.RaycastAll(
+            ray,
+            rayLength,
+            raycastInput.interactionMask,
+            QueryTriggerInteraction.Collide);
+
+        if (hits != null && hits.Length > 0)
+        {
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            RaycastHit hit = hits[0];
+            bool usefulHit = IsLOTOInteraction(hit.collider);
+
+            DrawRay(ray.origin, hit.point, usefulHit ? hitColor : missColor);
+            UpdateReticle(hit.point, true);
+            LogVisualHit(hit, usefulHit);
+            return;
+        }
+
+        DrawRay(ray.origin, ray.origin + ray.direction * rayLength, normalColor);
+        UpdateReticle(Vector3.zero, false);
+        LogVisualMiss();
+    }
+
+    private static bool IsLOTOInteraction(Collider collider)
+    {
+        if (collider == null)
+        {
+            return false;
+        }
+
+        LOTOClickable clickable = collider.GetComponentInParent<LOTOClickable>();
+        if (clickable != null && clickable.isActiveAndEnabled)
+        {
+            return true;
+        }
+
+        LOTOSnapObject snapObject = collider.GetComponentInParent<LOTOSnapObject>();
+        return snapObject != null && snapObject.isActiveAndEnabled;
+    }
+
+    private void DrawRay(Vector3 start, Vector3 end, Color color)
+    {
+        SetRayVisible(true);
+        rayLine.widthMultiplier = rayWidth;
+        rayLine.SetPosition(0, start);
+        rayLine.SetPosition(1, end);
+        SetRayColor(color);
+    }
+
+    private void SetRayVisible(bool visible)
+    {
+        if (rayLine != null)
+        {
+            rayLine.enabled = visible;
+        }
+    }
+
+    private void SetRayColor(Color color)
+    {
+        if (rayLine == null)
+        {
+            return;
+        }
+
+        rayLine.startColor = color;
+        rayLine.endColor = color;
+
+        Material material = rayLine.material;
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+        else if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", color);
+        }
+    }
+
+    private void UpdateReticle(Vector3 position, bool visible)
+    {
+        if (hitReticle == null)
+        {
+            return;
+        }
+
+        hitReticle.gameObject.SetActive(visible);
+        if (visible)
+        {
+            hitReticle.position = position;
+        }
+    }
+
+    private void SetReticleVisible(bool visible)
+    {
+        if (hitReticle != null)
+        {
+            hitReticle.gameObject.SetActive(visible);
+        }
+    }
+
+    private void LogVisualHit(RaycastHit hit, bool usefulHit)
+    {
+        if (hit.collider == lastRayHitCollider && usefulHit == lastRayHitWasUseful)
+        {
+            return;
+        }
+
+        lastRayHitCollider = hit.collider;
+        lastRayHitWasUseful = usefulHit;
+        Log($"LOTOXRControllerRayInput ray hit '{hit.collider.name}' at distance {hit.distance:0.00}. Useful LOTO target: {usefulHit}.");
+    }
+
+    private void LogVisualMiss()
+    {
+        if (lastRayHitCollider == null)
+        {
+            return;
+        }
+
+        lastRayHitCollider = null;
+        lastRayHitWasUseful = false;
+        Log("LOTOXRControllerRayInput ray hit nothing useful.");
+    }
+
+    private void Log(string message)
+    {
+        if (debugLogs)
+        {
+            Debug.Log(message);
+        }
+    }
+
+    private void LogOnce(ref bool logged, string message)
+    {
+        if (logged)
+        {
+            return;
+        }
+
+        logged = true;
+        Log(message);
+    }
+}
