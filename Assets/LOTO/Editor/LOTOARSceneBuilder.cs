@@ -11,6 +11,9 @@ public static class LOTOARSceneBuilder
     private const string ArScenePath = "Assets/Scenes/LOTO_AR.unity";
     private const string CameraRigPrefabPath = "Packages/com.meta.xr.sdk.core/Prefabs/OVRCameraRig.prefab";
     private const string PassthroughPrefabPath = "Packages/com.meta.xr.sdk.core/Editor/BuildingBlocks/BlockData/Passthrough/Prefabs/PassthroughUnderlay.prefab";
+    private const string EnvironmentRaycastPrefabPath = "Packages/com.meta.xr.mrutilitykit/Editor/BuildingBlocks/InstantContentPlacement/Prefabs/EnvironmentRaycastManager.prefab";
+    private const string GeneratorLoopClipPath = "Assets/LOTO/audio/Generator loop Sound.wav";
+    private const string GeneratorShutdownClipPath = "Assets/LOTO/audio/Generator, Shutting Down .wav";
 
     [MenuItem("LOTO/Create AR Scene")]
     public static void CreateARScene()
@@ -27,6 +30,10 @@ public static class LOTOARSceneBuilder
         ConfigurePassthrough(passthroughObject);
         GameObject placementRoot = ConfigureMRPlacementRoot();
         ConfigureMRPlacementController(placementRoot, cameraRig);
+        ConfigureAudioController(placementRoot);
+        CleanupMetaInteractionComponents();
+        ConfigureFallbackControllerInput(cameraRig, true);
+        EnsureEnvironmentRaycastManager();
         EnsureEventSystemObject();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -40,6 +47,8 @@ public static class LOTOARSceneBuilder
     private static void CleanupDeprecatedARObjects()
     {
         DestroySceneObject("OVRHandPrefabBuildingBlock");
+        DestroySceneObject("UnityXRComprehensiveInteractionRig");
+        DestroySceneObject("Controllers");
     }
 
     private static void DestroySceneObject(string objectName)
@@ -303,15 +312,155 @@ public static class LOTOARSceneBuilder
         LOTOMRPlacementController placementController = GetOrAdd<LOTOMRPlacementController>(placementManager);
         placementController.placementRoot = placementRoot.transform;
         placementController.headCamera = centerEyeCamera != null ? centerEyeCamera.transform : null;
-        placementController.forwardDistance = 1.8f;
+        placementController.forwardDistance = 3f;
         placementController.rightOffset = 0.5f;
         placementController.floorY = 0f;
         placementController.faceUser = true;
-        placementController.yawOffsetDegrees = 0f;
+        placementController.modelYawCorrectionDegrees = 0f;
         placementController.rootScale = 1f;
+        placementController.snapToFloor = true;
+        placementController.floorRayStartHeight = 2f;
+        placementController.floorRayDistance = 5f;
+        placementController.floorRaycastMask = ~0;
+        placementController.floorYOffset = 0f;
+        placementController.usePhysicsFloorFallback = true;
 
         EditorUtility.SetDirty(placementController);
         EditorUtility.SetDirty(placementManager);
+    }
+
+    private static void ConfigureAudioController(GameObject placementRoot)
+    {
+        GameObject lotoManager = GameObject.Find("LOTO_Manager");
+        if (lotoManager == null)
+        {
+            lotoManager = new GameObject("LOTO_Manager");
+            lotoManager.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+        }
+
+        LOTOAudioController audioController = GetOrAdd<LOTOAudioController>(lotoManager);
+        GameObject generatorModel = GameObject.Find("Generator_Model");
+        audioController.audioEmitter = generatorModel != null
+            ? generatorModel.transform
+            : placementRoot != null ? placementRoot.transform : lotoManager.transform;
+        audioController.generatorLoopClip = AssetDatabase.LoadAssetAtPath<AudioClip>(GeneratorLoopClipPath);
+        audioController.generatorShutdownClip = AssetDatabase.LoadAssetAtPath<AudioClip>(GeneratorShutdownClipPath);
+        audioController.playGeneratorLoopOnStart = true;
+        audioController.defaultVolume = 1f;
+        audioController.spatialBlend = 1f;
+        audioController.spatialize = true;
+        audioController.rolloffMode = AudioRolloffMode.Linear;
+        audioController.minDistance = 0.5f;
+        audioController.maxDistance = 12f;
+
+#if UNITY_2023_1_OR_NEWER
+        LOTOStateController stateController = Object.FindFirstObjectByType<LOTOStateController>(FindObjectsInactive.Include);
+#else
+        LOTOStateController stateController = Object.FindObjectOfType<LOTOStateController>(true);
+#endif
+
+        if (stateController != null)
+        {
+            stateController.audioController = audioController;
+            EditorUtility.SetDirty(stateController);
+        }
+
+        EditorUtility.SetDirty(audioController);
+        EditorUtility.SetDirty(lotoManager);
+    }
+
+    private static void ConfigureFallbackControllerInput(GameObject cameraRig, bool enableFallback)
+    {
+        if (cameraRig == null)
+        {
+            return;
+        }
+
+        LOTOXRControllerRayInput controllerInput = cameraRig.GetComponent<LOTOXRControllerRayInput>();
+        if (controllerInput == null)
+        {
+            return;
+        }
+
+        controllerInput.enableFallbackTriggerInput = enableFallback;
+        controllerInput.enableVisibleRay = enableFallback;
+        controllerInput.drawDebugRays = enableFallback;
+        controllerInput.disableWhenMetaInteractionRigPresent = false;
+        controllerInput.enableRayGrabSnapObjects = true;
+        controllerInput.enabled = enableFallback;
+        EditorUtility.SetDirty(controllerInput);
+    }
+
+    private static void CleanupMetaInteractionComponents()
+    {
+        string[] targetNames =
+        {
+            "SwitchBoxClickTarget",
+            "PowerHandleClickTarget",
+            "Padlock",
+            "WarningTag",
+            "MainDoorClickTarget"
+        };
+
+        string[] componentTypeNames =
+        {
+            "Oculus.Interaction.RayInteractable",
+            "Oculus.Interaction.Surfaces.ColliderSurface",
+            "Oculus.Interaction.InteractableUnityEventWrapper",
+            "Oculus.Interaction.Grabbable",
+            "Oculus.Interaction.GrabInteractable",
+            "Oculus.Interaction.DistanceGrabInteractable",
+            "Oculus.Interaction.MoveTowardsTargetProvider",
+            "Oculus.Interaction.GrabFreeTransformer",
+            "LOTOMetaRaySelectBridge",
+            "LOTOMetaGrabSnapBridge",
+            "LOTOInteractionEventBridge"
+        };
+
+        foreach (string targetName in targetNames)
+        {
+            GameObject target = GameObject.Find(targetName);
+            if (target != null)
+            {
+                RemoveComponentsByTypeName(target, componentTypeNames);
+            }
+        }
+    }
+
+    private static void RemoveComponentsByTypeName(GameObject target, string[] typeNames)
+    {
+        Component[] components = target.GetComponents<Component>();
+        foreach (Component component in components)
+        {
+            if (component == null)
+            {
+                continue;
+            }
+
+            string componentTypeName = component.GetType().FullName;
+            foreach (string typeName in typeNames)
+            {
+                if (componentTypeName == typeName)
+                {
+                    Object.DestroyImmediate(component);
+                    break;
+                }
+            }
+        }
+    }
+
+    private static void EnsureEnvironmentRaycastManager()
+    {
+        if (GameObject.Find("EnvironmentRaycastManager") != null)
+        {
+            return;
+        }
+
+        GameObject manager = EnsurePrefabInstance("EnvironmentRaycastManager", EnvironmentRaycastPrefabPath);
+        if (manager == null)
+        {
+            Debug.LogWarning("Meta EnvironmentRaycastManager prefab was not found. LOTOMRPlacementController will use physics floor raycast and floorY fallback.");
+        }
     }
 
     private static Transform FindChild(Transform parent, string childName)

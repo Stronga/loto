@@ -1,0 +1,30 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/LOTO/UI/introuss.uss?fileID=7433441132597879392&amp;guid=c44d38e5f9a4cd04a9a0ad9679238019&amp;type=3#introuss"/>
+    <ui:VisualElement name="intro-root" class="intro-root" style="width: 761px;">
+        <ui:VisualElement name="intro-panel" class="intro-panel">
+            <ui:VisualElement name="intro-header" class="intro-header">
+                <ui:VisualElement class="intro-title-group">
+                    <ui:Label name="intro-title" text="LOTO Generator Safety Simulator" class="intro-title"/>
+                    <ui:Label name="intro-subtitle" text="Lockout / Tagout AR Training Experience" class="intro-subtitle"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:Label name="intro-description" text="In this training, you will safely shut down a generator before opening the service door. Follow each Lockout / Tagout step in the correct order to prevent unsafe access." class="intro-description"/>
+            <ui:VisualElement name="intro-info-card" class="intro-info-card">
+                <ui:Label text="Your task:" class="intro-section-title"/>
+                <ui:Label text="1. Open the switch box" class="intro-step"/>
+                <ui:Label text="2. Turn the main power OFF" class="intro-step"/>
+                <ui:Label text="3. Wait for the generator to shut down" class="intro-step"/>
+                <ui:Label text="4. Apply the lock and warning tag" class="intro-step"/>
+                <ui:Label text="5. Open the service door only when it is safe" class="intro-step"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="intro-warning-card" class="intro-warning-card">
+                <ui:Label text="!" class="intro-warning-icon"/>
+                <ui:Label name="intro-warning-text" text="Unsafe actions will trigger a warning. The service door will stay locked until the full LOTO procedure is complete." class="intro-warning-text"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="intro-footer" class="intro-footer">
+                <ui:Label name="intro-interaction-hint" text="Use  controller to interact with highlighted objects." class="intro-interaction-hint"/>
+                <ui:Button name="start-process-button" text="Start Process" class="start-process-button"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

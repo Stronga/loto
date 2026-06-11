@@ -9,9 +9,15 @@ public class LOTOXRControllerRayInput : MonoBehaviour
     public Transform leftRayOrigin;
     public bool useRightController = true;
     public bool useLeftController = true;
+    public bool enableFallbackTriggerInput = true;
+    public bool disableWhenMetaInteractionRigPresent = false;
+    public string metaInteractionRigName = "Controllers";
+    public bool enableRayGrabSnapObjects = true;
+    public float minimumGrabDistance = 0.25f;
     public bool debugLogs = true;
     public bool drawDebugRays = true;
     public float debugRayLength = 10f;
+    public bool enableVisibleRay = true;
     public LineRenderer rayLine;
     public float rayLength = 10f;
     public float rayWidth = 0.01f;
@@ -31,6 +37,11 @@ public class LOTOXRControllerRayInput : MonoBehaviour
     private bool loggedRayVisualActive;
     private Collider lastRayHitCollider;
     private bool lastRayHitWasUseful;
+    private LOTOSnapObject grabbedSnapObject;
+    private Transform grabbedRayOrigin;
+    private float grabbedDistance;
+    private Rigidbody grabbedRigidbody;
+    private bool grabbedRigidbodyWasKinematic;
 
     private void Awake()
     {
@@ -46,6 +57,11 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         EnsureRayLine();
     }
 
+    private void Start()
+    {
+        DisableForMetaInteractionRigIfPresent();
+    }
+
     private void Update()
     {
         if (raycastInput == null)
@@ -54,7 +70,20 @@ public class LOTOXRControllerRayInput : MonoBehaviour
             return;
         }
 
-        UpdateVisibleRay(GetActiveRayOrigin());
+        if (enableVisibleRay)
+        {
+            UpdateVisibleRay(GetActiveRayOrigin());
+        }
+        else
+        {
+            SetRayVisible(false);
+            SetReticleVisible(false);
+        }
+
+        if (!enableFallbackTriggerInput)
+        {
+            return;
+        }
 
         if (useRightController)
         {
@@ -103,11 +132,141 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         {
             Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
             Log($"LOTOXRControllerRayInput {controllerName} trigger pressed.");
+
+            if (TryBeginSnapObjectGrab(rayOrigin, ray, controllerName))
+            {
+                wasPressed = isPressed;
+                return;
+            }
+
             bool didTrigger = raycastInput.TriggerAtRay(ray);
             Log($"LOTOXRControllerRayInput TriggerAtRay returned {didTrigger} for {controllerName} controller.");
         }
+        else if (isPressed && grabbedSnapObject != null && grabbedRayOrigin == rayOrigin)
+        {
+            UpdateGrabbedSnapObject();
+        }
+        else if (!isPressed && wasPressed && grabbedSnapObject != null && grabbedRayOrigin == rayOrigin)
+        {
+            ReleaseGrabbedSnapObject(controllerName);
+        }
 
         wasPressed = isPressed;
+    }
+
+    private bool TryBeginSnapObjectGrab(Transform rayOrigin, Ray ray, string controllerName)
+    {
+        if (!enableRayGrabSnapObjects || rayOrigin == null)
+        {
+            return false;
+        }
+
+        if (!TryFindSnapObject(ray, out LOTOSnapObject snapObject, out RaycastHit hit))
+        {
+            return false;
+        }
+
+        if (!IsCurrentSnapAction(snapObject))
+        {
+            snapObject.TriggerSnap();
+            return true;
+        }
+
+        grabbedSnapObject = snapObject;
+        grabbedRayOrigin = rayOrigin;
+        grabbedDistance = Mathf.Clamp(hit.distance, minimumGrabDistance, rayLength);
+        grabbedRigidbody = grabbedSnapObject.GetComponent<Rigidbody>();
+        if (grabbedRigidbody != null)
+        {
+            grabbedRigidbodyWasKinematic = grabbedRigidbody.isKinematic;
+            grabbedRigidbody.isKinematic = true;
+        }
+
+        UpdateGrabbedSnapObject();
+        Log($"LOTOXRControllerRayInput {controllerName} grabbed '{grabbedSnapObject.name}' at distance {grabbedDistance:0.00}.");
+        return true;
+    }
+
+    private void UpdateGrabbedSnapObject()
+    {
+        if (grabbedSnapObject == null || grabbedRayOrigin == null)
+        {
+            return;
+        }
+
+        Vector3 targetPosition = grabbedRayOrigin.position + grabbedRayOrigin.forward * grabbedDistance;
+        grabbedSnapObject.transform.position = targetPosition;
+    }
+
+    private void ReleaseGrabbedSnapObject(string controllerName)
+    {
+        LOTOSnapObject releasedSnapObject = grabbedSnapObject;
+        Rigidbody releasedRigidbody = grabbedRigidbody;
+
+        grabbedSnapObject = null;
+        grabbedRayOrigin = null;
+        grabbedRigidbody = null;
+
+        if (releasedRigidbody != null)
+        {
+            releasedRigidbody.isKinematic = grabbedRigidbodyWasKinematic;
+        }
+
+        if (releasedSnapObject == null)
+        {
+            return;
+        }
+
+        Log($"LOTOXRControllerRayInput {controllerName} released '{releasedSnapObject.name}', triggering snap.");
+        releasedSnapObject.TriggerSnap();
+    }
+
+    private bool TryFindSnapObject(Ray ray, out LOTOSnapObject snapObject, out RaycastHit snapHit)
+    {
+        snapObject = null;
+        snapHit = default;
+
+        RaycastHit[] hits = Physics.RaycastAll(
+            ray,
+            rayLength,
+            raycastInput.interactionMask,
+            QueryTriggerInteraction.Collide);
+
+        if (hits == null || hits.Length == 0)
+        {
+            return false;
+        }
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            LOTOSnapObject hitSnapObject = hits[i].collider.GetComponentInParent<LOTOSnapObject>();
+            if (hitSnapObject == null || !hitSnapObject.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            snapObject = hitSnapObject;
+            snapHit = hits[i];
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsCurrentSnapAction(LOTOSnapObject snapObject)
+    {
+        if (snapObject == null)
+        {
+            return false;
+        }
+
+        LOTOStateController controller = snapObject.stateController != null
+            ? snapObject.stateController
+            : LOTOStateController.Active;
+
+        return controller != null && controller.IsCurrentAction(snapObject.notifyAction);
     }
 
     private bool IsSelectPressed(InputDeviceCharacteristics characteristics, string controllerName, ref bool loggedMissingDevice)
@@ -213,6 +372,28 @@ public class LOTOXRControllerRayInput : MonoBehaviour
 
         SetRayColor(normalColor);
         LogOnce(ref loggedRayVisualActive, "LOTOXRControllerRayInput ray visual active.");
+    }
+
+    private void DisableForMetaInteractionRigIfPresent()
+    {
+        if (!disableWhenMetaInteractionRigPresent || string.IsNullOrEmpty(metaInteractionRigName))
+        {
+            return;
+        }
+
+        GameObject metaInteractionRig = GameObject.Find(metaInteractionRigName);
+        if (metaInteractionRig == null)
+        {
+            return;
+        }
+
+        enableFallbackTriggerInput = false;
+        enableVisibleRay = false;
+        drawDebugRays = false;
+        SetRayVisible(false);
+        SetReticleVisible(false);
+        Log($"LOTOXRControllerRayInput disabled because Meta interaction rig '{metaInteractionRigName}' is present.");
+        enabled = false;
     }
 
     private static Material CreateRayMaterial()

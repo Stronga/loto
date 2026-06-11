@@ -1,0 +1,32 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/LOTO/UI/sucessuss.uss?fileID=7433441132597879392&amp;guid=573bf569cc9ad534c9dc8b4d654a47fa&amp;type=3#sucessuss"/>
+    <ui:VisualElement name="success-root" class="success-root">
+        <ui:VisualElement name="success-panel" class="success-panel">
+            <ui:VisualElement name="success-left">
+                <ui:VisualElement name="success-icon-ring" class="success-icon-ring">
+                    <ui:Label text="✓" class="success-icon"/>
+                </ui:VisualElement>
+                <ui:Label name="success-title" text="LOTO Complete" class="success-title"/>
+                <ui:Label name="success-message" text="The generator has been safely locked out and tagged. You may now access the service area." class="success-message"/>
+                <ui:Button name="success-restart-button" text="Restart" class="success-restart-button"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="success-right">
+                <ui:Label text="Completed safety steps:" class="success-section-title"/>
+                <ui:VisualElement name="success-steps-grid" class="success-steps-grid">
+                    <ui:VisualElement class="success-step-column">
+                        <ui:Label text="✓ Switch box opened" class="success-step"/>
+                        <ui:Label text="✓ Main power turned OFF" class="success-step"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="success-step-column">
+                        <ui:Label text="✓ Generator shutdown complete" class="success-step"/>
+                        <ui:Label text="✓ Lockout device applied" class="success-step"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="success-step-column">
+                        <ui:Label text="✓ Warning tag attached" class="success-step"/>
+                        <ui:Label text="✓ Service door opened safely" class="success-step"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

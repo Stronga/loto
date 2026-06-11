@@ -1,0 +1,76 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Style src="project://database/Assets/LOTO/UI/lotonewuiuss.uss?fileID=7433441132597879392&amp;guid=56acb7f965e3b804d9892f1c5722a236&amp;type=3#lotonewuiuss"/>
+    <ui:VisualElement name="hud-root" class="hud-root">
+        <ui:VisualElement name="checklist-panel" class="checklist-panel">
+            <ui:VisualElement name="header-row" class="header-row">
+                <ui:VisualElement name="status-dot" class="status-dot status-active"/>
+                <ui:VisualElement class="header-text-group">
+                    <ui:Label name="checklist-title" text="LOTO CHECKLIST" class="title"/>
+                    <ui:Label name="checklist-subtitle" text="Lockout / Tagout Procedure" class="subtitle" style="align-self: center;"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="progress-track" class="progress-track">
+                <ui:VisualElement name="progress-fill" class="progress-fill"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="steps-container" class="steps-container">
+                <ui:VisualElement name="row-open-switch-box" class="step-row step-complete">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="1" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-open-switch-box" text="Open switch box" class="step"/>
+                    <ui:Label text="✓" class="step-state complete-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-turn-power-off" class="step-row step-current">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="2" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-turn-power-off" text="Turn power OFF" class="step"/>
+                    <ui:Label text="●" class="step-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-close-switch-box" class="step-row">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="3" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-close-switch-box" text="Close switch box" class="step"/>
+                    <ui:Label text="○" class="step-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-wait-shutdown" class="step-row">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="4" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-wait-shutdown" text="Wait for shutdown" class="step"/>
+                    <ui:Label text="○" class="step-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-apply-lock" class="step-row">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="5" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-apply-lock" text="Apply lock" class="step"/>
+                    <ui:Label text="○" class="step-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-apply-tag" class="step-row">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="6" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-apply-tag" text="Apply warning tag" class="step"/>
+                    <ui:Label text="○" class="step-state"/>
+                </ui:VisualElement>
+                <ui:VisualElement name="row-open-service-door" class="step-row">
+                    <ui:VisualElement class="step-index">
+                        <ui:Label text="7" class="step-index-text"/>
+                    </ui:VisualElement>
+                    <ui:Label name="step-open-service-door" text="Open service door" class="step"/>
+                    <ui:Label text="○" class="step-state"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="footer-row" class="footer-row">
+                <ui:Button name="hint-button" text="Hint" class="secondary-button"/>
+                <ui:Button name="restart-button" text="Restart" class="primary-button"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="warning-panel" class="warning-panel hidden">
+            <ui:Label text="!" class="warning-icon"/>
+            <ui:Label name="warning-message" text="Warning message appears here. Make sure the machine is fully powered down before continuing." class="warning-message"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

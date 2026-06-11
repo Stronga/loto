@@ -1,0 +1,117 @@
+.success-root {
+    width: 920px;
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+}
+
+.success-panel {
+    min-height: 360px;
+    padding: 30px;
+    border-radius: 34px;
+    flex-direction: row;
+    align-items: stretch;
+    background-color: rgba(8, 22, 16, 0.86);
+    border-width: 1.5px;
+    border-color: rgba(80, 240, 150, 0.75);
+}
+
+.success-left {
+    width: 320px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-right: 28px;
+    border-right-width: 1px;
+    border-right-color: rgba(120, 255, 180, 0.22);
+}
+
+.success-right {
+    flex-grow: 1;
+    flex-direction: column;
+    justify-content: center;
+    padding-left: 30px;
+}
+
+.success-icon-ring {
+    width: 88px;
+    height: 88px;
+    border-radius: 44px;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(80, 240, 150, 0.18);
+    border-width: 2px;
+    border-color: rgba(80, 240, 150, 0.9);
+    margin-bottom: 18px;
+}
+
+.success-icon {
+    font-size: 52px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(80, 240, 150);
+}
+
+.success-title {
+    font-size: 36px;
+    -unity-font-style: bold;
+    color: rgb(235, 255, 244);
+    margin-bottom: 10px;
+    -unity-text-align: middle-center;
+}
+
+.success-message {
+    font-size: 20px;
+    line-height: 28px;
+    white-space: normal;
+    -unity-text-align: middle-center;
+    color: rgba(225, 245, 235, 0.88);
+    margin-bottom: 24px;
+}
+
+.success-restart-button {
+    width: 220px;
+    height: 54px;
+    border-radius: 27px;
+    font-size: 22px;
+    -unity-font-style: bold;
+    color: rgb(5, 18, 12);
+    background-color: rgb(80, 240, 150);
+}
+
+.success-section-title {
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(120, 255, 180);
+    margin-bottom: 18px;
+}
+
+.success-steps-grid {
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-between;
+}
+
+.success-step-column {
+    width: 31%;
+    flex-direction: column;
+}
+
+.success-step {
+    min-height: 64px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-radius: 18px;
+    font-size: 19px;
+    line-height: 25px;
+    white-space: normal;
+    color: rgb(235, 250, 242);
+    background-color: rgba(80, 240, 150, 0.14);
+    border-width: 1px;
+    border-color: rgba(120, 255, 180, 0.34);
+}
+
+.hidden {
+    display: none;
+}

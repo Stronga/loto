@@ -10,6 +10,7 @@ public class LOTOStateController : MonoBehaviour
     public LOTOAnimationController animationController;
     public LOTOChecklistUI checklistUI;
     public LOTOWarningFeedback warningFeedback;
+    public LOTOAudioController audioController;
 
     [Header("Next Step Highlights")]
     public LOTOHighlightTarget switchBoxHighlight;
@@ -82,11 +83,26 @@ public class LOTOStateController : MonoBehaviour
             warningFeedback = GetComponent<LOTOWarningFeedback>();
         }
 
+        if (audioController == null)
+        {
+            audioController = GetComponent<LOTOAudioController>();
+        }
+
+        if (audioController == null)
+        {
+#if UNITY_2023_1_OR_NEWER
+            audioController = FindFirstObjectByType<LOTOAudioController>();
+#else
+            audioController = FindObjectOfType<LOTOAudioController>();
+#endif
+        }
+
         RepairSceneReferences();
     }
 
     private void Start()
     {
+        audioController?.PlayGeneratorLoop();
         NotifyStateChanged();
     }
 
@@ -113,6 +129,7 @@ public class LOTOStateController : MonoBehaviour
 
         switchBoxOpened = true;
         switchBoxClosed = false;
+        audioController?.PlaySwitchBoxOpen();
         animationController?.PlaySwitchBoxOpen();
         NotifyStateChanged();
     }
@@ -143,6 +160,7 @@ public class LOTOStateController : MonoBehaviour
         }
 
         switchBoxClosed = true;
+        audioController?.PlaySwitchBoxClose();
         animationController?.PlaySwitchBoxClose();
         NotifyStateChanged();
     }
@@ -164,6 +182,7 @@ public class LOTOStateController : MonoBehaviour
         shutdownComplete = false;
         ShutdownInProgress = true;
 
+        audioController?.PlayPowerHandleToggle();
         animationController?.PlayPowerHandleToggle();
 
         if (autoCompleteShutdown)
@@ -230,6 +249,7 @@ public class LOTOStateController : MonoBehaviour
         }
 
         lockApplied = true;
+        audioController?.PlayApplyLock();
         NotifyStateChanged();
     }
 
@@ -252,6 +272,7 @@ public class LOTOStateController : MonoBehaviour
         }
 
         tagApplied = true;
+        audioController?.PlayApplyTag();
         NotifyStateChanged();
     }
 
@@ -272,6 +293,7 @@ public class LOTOStateController : MonoBehaviour
                 }
 
                 lockApplied = true;
+                audioController?.PlayApplyLock();
                 NotifyStateChanged();
                 return true;
 
@@ -288,6 +310,7 @@ public class LOTOStateController : MonoBehaviour
                 }
 
                 tagApplied = true;
+                audioController?.PlayApplyTag();
                 NotifyStateChanged();
                 return true;
 
@@ -311,6 +334,7 @@ public class LOTOStateController : MonoBehaviour
         }
 
         mainDoorOpened = true;
+        audioController?.PlayMainDoorOpen();
         animationController?.PlayMainDoorOpen();
         NotifyStateChanged();
     }
@@ -334,11 +358,13 @@ public class LOTOStateController : MonoBehaviour
 
         animationController?.ResetPoses();
         ResetSnapObjects();
+        audioController?.PlayGeneratorLoop();
         NotifyStateChanged();
     }
 
     public void ShowWarning(string message)
     {
+        audioController?.PlayWarning();
         warningFeedback?.ShowWarning(message);
         warningIssued?.Invoke(message);
         Debug.LogWarning(message);
@@ -358,6 +384,7 @@ public class LOTOStateController : MonoBehaviour
 
         yield return new WaitForSeconds(powerHandleDuration);
 
+        audioController?.PlayGeneratorShutdown();
         animationController?.PlayShutdownAndCableWiggle();
 
         float generatorShutdownDuration = animationController != null
@@ -425,12 +452,14 @@ public class LOTOStateController : MonoBehaviour
         if (!lockApplied && switchBoxOpened && switchBoxClosed && powerHandleOff && shutdownComplete && IsObjectAtSnapTarget("Padlock", "LockSnapTarget"))
         {
             lockApplied = true;
+            audioController?.PlayApplyLock();
             changed = true;
         }
 
         if (!tagApplied && lockApplied && IsObjectAtSnapTarget("WarningTag", "TagSnapTarget"))
         {
             tagApplied = true;
+            audioController?.PlayApplyTag();
             changed = true;
         }
 

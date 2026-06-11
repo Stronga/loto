@@ -1,0 +1,1 @@
+C:\GitHub\loto_unity\loto\Library\Bee\artifacts\Android\il2cppOutput\cpp
