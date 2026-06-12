@@ -31,6 +31,11 @@ public class LOTOClickable : MonoBehaviour
             return;
         }
 
+        if (stateController.InputLocked)
+        {
+            return;
+        }
+
         switch (actionType)
         {
             case LOTOActionType.OpenSwitchBox:

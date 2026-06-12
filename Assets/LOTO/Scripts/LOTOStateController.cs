@@ -25,6 +25,7 @@ public class LOTOStateController : MonoBehaviour
     public float fallbackPowerHandleDuration = 1f;
 
     [Header("Runtime State")]
+    public bool inputLocked;
     public bool switchBoxOpened;
     public bool switchBoxClosed;
     public bool powerHandleOff;
@@ -32,6 +33,15 @@ public class LOTOStateController : MonoBehaviour
     public bool lockApplied;
     public bool tagApplied;
     public bool mainDoorOpened;
+
+    [Header("Hint Indicator")]
+    public bool indicatorsRequireHint = true;
+    public bool hintVisible;
+
+    [Header("Generator Off Light")]
+    public Light generatorShutdownLight;
+    public string generatorShutdownLightName = "Point Light";
+    public bool autoFindGeneratorShutdownLight = true;
 
     [Header("Events")]
     public UnityEvent stateChanged;
@@ -41,6 +51,7 @@ public class LOTOStateController : MonoBehaviour
     private Material fallbackHighlightMaterial;
 
     public bool ShutdownInProgress { get; private set; }
+    public bool InputLocked => inputLocked;
     public bool CanApplyLock => switchBoxOpened && switchBoxClosed && powerHandleOff && shutdownComplete && !lockApplied;
     public bool CanApplyTag => lockApplied && !tagApplied;
     public bool CanOpenMainDoor => switchBoxOpened && switchBoxClosed && powerHandleOff && shutdownComplete && lockApplied && tagApplied;
@@ -97,6 +108,8 @@ public class LOTOStateController : MonoBehaviour
 #endif
         }
 
+        ResolveGeneratorShutdownLight();
+        UpdateGeneratorShutdownLight();
         RepairSceneReferences();
     }
 
@@ -121,6 +134,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void OpenSwitchBox()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (switchBoxOpened)
         {
             TryCloseSwitchBox();
@@ -136,6 +154,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void TryCloseSwitchBox()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (!switchBoxOpened)
         {
             ShowWarning("Open the switch box first.");
@@ -167,6 +190,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void TogglePowerHandle()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (!switchBoxOpened)
         {
             ShowWarning("Open the switch box first.");
@@ -219,6 +247,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void ApplyLock()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (lockApplied)
         {
             return;
@@ -255,6 +288,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void ApplyTag()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (!lockApplied)
         {
             SynchronizeStateFromSnappedObjects();
@@ -278,6 +316,11 @@ public class LOTOStateController : MonoBehaviour
 
     public bool CompleteSnapAction(LOTOActionType actionType)
     {
+        if (InputLocked)
+        {
+            return false;
+        }
+
         switch (actionType)
         {
             case LOTOActionType.ApplyLock:
@@ -322,6 +365,11 @@ public class LOTOStateController : MonoBehaviour
 
     public void TryOpenMainDoor()
     {
+        if (InputLocked)
+        {
+            return;
+        }
+
         if (mainDoorOpened)
         {
             return;
@@ -355,6 +403,7 @@ public class LOTOStateController : MonoBehaviour
         tagApplied = false;
         mainDoorOpened = false;
         ShutdownInProgress = false;
+        hintVisible = false;
 
         animationController?.ResetPoses();
         ResetSnapObjects();
@@ -368,6 +417,27 @@ public class LOTOStateController : MonoBehaviour
         warningFeedback?.ShowWarning(message);
         warningIssued?.Invoke(message);
         Debug.LogWarning(message);
+    }
+
+    public void SetInputLocked(bool locked)
+    {
+        inputLocked = locked;
+        if (locked)
+        {
+            HideCurrentHint();
+        }
+    }
+
+    public void RevealCurrentHint()
+    {
+        hintVisible = true;
+        UpdateHighlights();
+    }
+
+    public void HideCurrentHint()
+    {
+        hintVisible = false;
+        UpdateHighlights();
     }
 
     private IEnumerator CompleteShutdownAfterDelay()
@@ -397,19 +467,26 @@ public class LOTOStateController : MonoBehaviour
 
     private void NotifyStateChanged()
     {
+        if (indicatorsRequireHint)
+        {
+            hintVisible = false;
+        }
+
         SynchronizeStateFromSnappedObjects(false);
         checklistUI?.UpdateChecklist(this);
         UpdateHighlights();
+        UpdateGeneratorShutdownLight();
         stateChanged?.Invoke();
     }
 
     private void UpdateHighlights()
     {
-        SetHighlight(switchBoxHighlight, !switchBoxOpened || (switchBoxOpened && powerHandleOff && shutdownComplete && !switchBoxClosed));
-        SetHighlight(powerHandleHighlight, switchBoxOpened && !switchBoxClosed && !powerHandleOff);
-        SetHighlight(lockHighlight, CanApplyLock);
-        SetHighlight(tagHighlight, lockApplied && !tagApplied);
-        SetHighlight(mainDoorHighlight, CanOpenMainDoor && !mainDoorOpened);
+        bool allowHighlight = !indicatorsRequireHint || hintVisible;
+        SetHighlight(switchBoxHighlight, allowHighlight && (!switchBoxOpened || (switchBoxOpened && powerHandleOff && shutdownComplete && !switchBoxClosed)));
+        SetHighlight(powerHandleHighlight, allowHighlight && switchBoxOpened && !switchBoxClosed && !powerHandleOff);
+        SetHighlight(lockHighlight, allowHighlight && CanApplyLock);
+        SetHighlight(tagHighlight, allowHighlight && lockApplied && !tagApplied);
+        SetHighlight(mainDoorHighlight, allowHighlight && CanOpenMainDoor && !mainDoorOpened);
     }
 
     private static void SetHighlight(LOTOHighlightTarget target, bool active)
@@ -443,6 +520,58 @@ public class LOTOStateController : MonoBehaviour
         tagHighlight = EnsureSeparateIndicator("WarningTagIndicator", warningTag != null ? warningTag.transform : null, tagHighlight);
 
         checklistUI?.UpdateChecklist(this);
+    }
+
+    private void ResolveGeneratorShutdownLight()
+    {
+        if (generatorShutdownLight != null || !autoFindGeneratorShutdownLight)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(generatorShutdownLightName))
+        {
+            GameObject namedLight = GameObject.Find(generatorShutdownLightName);
+            if (namedLight != null)
+            {
+                generatorShutdownLight = namedLight.GetComponentInChildren<Light>(true);
+            }
+        }
+
+        if (generatorShutdownLight != null)
+        {
+            return;
+        }
+
+#if UNITY_2023_1_OR_NEWER
+        Light[] lights = FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+#else
+        Light[] lights = FindObjectsOfType<Light>(true);
+#endif
+
+        foreach (Light light in lights)
+        {
+            if (light == null || light.type == LightType.Directional)
+            {
+                continue;
+            }
+
+            string lightName = light.name.ToLowerInvariant();
+            if (lightName.Contains("shutdown") || lightName.Contains("generator") || lightName.Contains("off"))
+            {
+                generatorShutdownLight = light;
+                return;
+            }
+        }
+    }
+
+    private void UpdateGeneratorShutdownLight()
+    {
+        ResolveGeneratorShutdownLight();
+        if (generatorShutdownLight != null)
+        {
+            generatorShutdownLight.enabled = shutdownComplete;
+        }
     }
 
     private void SynchronizeStateFromSnappedObjects(bool notifyWhenChanged = true)

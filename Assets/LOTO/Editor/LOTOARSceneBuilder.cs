@@ -4,6 +4,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
 
 public static class LOTOARSceneBuilder
 {
@@ -14,6 +15,11 @@ public static class LOTOARSceneBuilder
     private const string EnvironmentRaycastPrefabPath = "Packages/com.meta.xr.mrutilitykit/Editor/BuildingBlocks/InstantContentPlacement/Prefabs/EnvironmentRaycastManager.prefab";
     private const string GeneratorLoopClipPath = "Assets/LOTO/audio/Generator loop Sound.wav";
     private const string GeneratorShutdownClipPath = "Assets/LOTO/audio/Generator, Shutting Down .wav";
+    private const string IntroUxmlPath = "Assets/LOTO/UI/introUI.uxml";
+    private const string ChecklistUxmlPath = "Assets/LOTO/UI/lotonewui.uxml";
+    private const string SuccessUxmlPath = "Assets/LOTO/UI/sucessui.uxml";
+    private const string ChecklistUssPath = "Assets/LOTO/UI/lotonewuiuss.uss";
+    private const string HudPanelSettingsPath = "Assets/LOTO/UI/LOTO_HUD_PanelSettings.asset";
 
     [MenuItem("LOTO/Create AR Scene")]
     public static void CreateARScene()
@@ -31,6 +37,7 @@ public static class LOTOARSceneBuilder
         GameObject placementRoot = ConfigureMRPlacementRoot();
         ConfigureMRPlacementController(placementRoot, cameraRig);
         ConfigureAudioController(placementRoot);
+        ConfigureNewToolkitUi();
         CleanupMetaInteractionComponents();
         ConfigureFallbackControllerInput(cameraRig, true);
         EnsureEnvironmentRaycastManager();
@@ -42,6 +49,24 @@ public static class LOTOARSceneBuilder
 
         Selection.activeObject = placementRoot != null ? placementRoot : cameraRig;
         Debug.Log($"Created Meta MR LOTO scene at {ArScenePath}. The generator content is placed once at runtime under LOTO_MR_PlacementRoot.");
+    }
+
+    [MenuItem("LOTO/Configure AR UI Only")]
+    public static void ConfigureARUiOnly()
+    {
+        ConfigureNewToolkitUi();
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.IsValid())
+        {
+            EditorSceneManager.MarkSceneDirty(activeScene);
+            if (!string.IsNullOrWhiteSpace(activeScene.path))
+            {
+                EditorSceneManager.SaveScene(activeScene);
+            }
+        }
+
+        Debug.Log("Configured separate tag-along LOTO AR UI documents for the open scene.");
     }
 
     private static void CleanupDeprecatedARObjects()
@@ -259,8 +284,7 @@ public static class LOTOARSceneBuilder
         {
             "Generator_Model",
             "InteractionTargets",
-            "Props",
-            "UI"
+            "Props"
         };
 
         foreach (string rootName in placedContentRoots)
@@ -280,8 +304,24 @@ public static class LOTOARSceneBuilder
             EditorUtility.SetDirty(lotoManager);
         }
 
+        DetachUiObjectFromPlacementRoot("LOTO_UIDocument", placementRoot.transform);
+        DetachUiObjectFromPlacementRoot("LOTO_UIRoot", placementRoot.transform);
+        DetachUiObjectFromPlacementRoot("LOTO_Intro_UIDocument", placementRoot.transform);
+        DetachUiObjectFromPlacementRoot("LOTO_Checklist_UIDocument", placementRoot.transform);
+        DetachUiObjectFromPlacementRoot("LOTO_Success_UIDocument", placementRoot.transform);
+
         EditorUtility.SetDirty(placementRoot);
         return placementRoot;
+    }
+
+    private static void DetachUiObjectFromPlacementRoot(string objectName, Transform placementRoot)
+    {
+        GameObject uiObject = GameObject.Find(objectName);
+        if (uiObject != null && uiObject.transform.IsChildOf(placementRoot))
+        {
+            uiObject.transform.SetParent(null, true);
+            EditorUtility.SetDirty(uiObject);
+        }
     }
 
     private static void MoveChildren(Transform source, Transform destination)
@@ -369,6 +409,172 @@ public static class LOTOARSceneBuilder
         EditorUtility.SetDirty(lotoManager);
     }
 
+    private static void ConfigureNewToolkitUi()
+    {
+#if UNITY_2023_1_OR_NEWER
+        LOTOChecklistUI checklistUI = Object.FindFirstObjectByType<LOTOChecklistUI>(FindObjectsInactive.Include);
+        LOTOWarningFeedback warningFeedback = Object.FindFirstObjectByType<LOTOWarningFeedback>(FindObjectsInactive.Include);
+#else
+        LOTOChecklistUI checklistUI = Object.FindObjectOfType<LOTOChecklistUI>(true);
+        LOTOWarningFeedback warningFeedback = Object.FindObjectOfType<LOTOWarningFeedback>(true);
+#endif
+
+        if (checklistUI == null)
+        {
+            return;
+        }
+
+        VisualTreeAsset introVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(IntroUxmlPath);
+        VisualTreeAsset checklistVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(ChecklistUxmlPath);
+        VisualTreeAsset successVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(SuccessUxmlPath);
+        StyleSheet checklistStyle = AssetDatabase.LoadAssetAtPath<StyleSheet>(ChecklistUssPath);
+        PanelSettings panelSettings = AssetDatabase.LoadAssetAtPath<PanelSettings>(HudPanelSettingsPath);
+        Transform headCamera = ResolveHeadCameraTransform();
+
+        GameObject uiRoot = GameObject.Find("LOTO_UIRoot");
+        if (uiRoot == null)
+        {
+            uiRoot = new GameObject("LOTO_UIRoot");
+            uiRoot.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+        }
+
+        GameObject placementRoot = GameObject.Find("LOTO_MR_PlacementRoot");
+        if (placementRoot != null)
+        {
+            DetachUiObjectFromPlacementRoot("LOTO_UIDocument", placementRoot.transform);
+            DetachUiObjectFromPlacementRoot("LOTO_UIRoot", placementRoot.transform);
+            DetachUiObjectFromPlacementRoot("LOTO_Intro_UIDocument", placementRoot.transform);
+            DetachUiObjectFromPlacementRoot("LOTO_Checklist_UIDocument", placementRoot.transform);
+            DetachUiObjectFromPlacementRoot("LOTO_Success_UIDocument", placementRoot.transform);
+        }
+
+        UIDocument introDocument = GetOrCreateToolkitDocument(
+            "LOTO_Intro_UIDocument",
+            "LOTO_UIDocument",
+            uiRoot.transform,
+            panelSettings,
+            introVisualTree,
+            headCamera,
+            new Vector3(0f, -0.06f, 1.55f),
+            0f);
+
+        UIDocument checklistDocument = GetOrCreateToolkitDocument(
+            "LOTO_Checklist_UIDocument",
+            null,
+            uiRoot.transform,
+            panelSettings,
+            checklistVisualTree,
+            headCamera,
+            new Vector3(0.78f, -0.08f, 1.35f),
+            0f);
+
+        UIDocument successDocument = GetOrCreateToolkitDocument(
+            "LOTO_Success_UIDocument",
+            null,
+            uiRoot.transform,
+            panelSettings,
+            successVisualTree,
+            headCamera,
+            new Vector3(0f, -0.06f, 1.6f),
+            0f);
+
+        checklistUI.uiDocument = introDocument != null ? introDocument : checklistDocument;
+        checklistUI.introDocument = introDocument;
+        checklistUI.checklistDocument = checklistDocument;
+        checklistUI.successDocument = successDocument;
+        checklistUI.styleSheet = checklistStyle;
+        checklistUI.introVisualTree = introVisualTree;
+        checklistUI.checklistVisualTree = checklistVisualTree;
+        checklistUI.successVisualTree = successVisualTree;
+        checklistUI.useSeparateToolkitDocuments = true;
+        checklistUI.showIntroOnStart = introVisualTree != null;
+        checklistUI.lockInputUntilStarted = introVisualTree != null;
+        checklistUI.introPanelSizeMeters = new Vector2(0.95f, 0.75f);
+        checklistUI.checklistPanelSizeMeters = new Vector2(0.82f, 0.9f);
+        checklistUI.successPanelSizeMeters = new Vector2(1.25f, 0.65f);
+
+        if (warningFeedback != null)
+        {
+            warningFeedback.uiDocument = checklistDocument != null ? checklistDocument : checklistUI.uiDocument;
+            warningFeedback.warningPanel = null;
+            warningFeedback.warningText = null;
+            EditorUtility.SetDirty(warningFeedback);
+        }
+
+        SetInitialToolkitDocumentState(introDocument, introVisualTree != null);
+        SetInitialToolkitDocumentState(checklistDocument, introVisualTree == null);
+        SetInitialToolkitDocumentState(successDocument, false);
+
+        EditorUtility.SetDirty(uiRoot);
+        EditorUtility.SetDirty(checklistUI);
+    }
+
+    private static UIDocument GetOrCreateToolkitDocument(
+        string objectName,
+        string fallbackObjectName,
+        Transform parent,
+        PanelSettings panelSettings,
+        VisualTreeAsset visualTreeAsset,
+        Transform headCamera,
+        Vector3 headSpaceOffset,
+        float yawOffsetDegrees)
+    {
+        GameObject uiObject = GameObject.Find(objectName);
+        if (uiObject == null && !string.IsNullOrWhiteSpace(fallbackObjectName))
+        {
+            uiObject = GameObject.Find(fallbackObjectName);
+            if (uiObject != null)
+            {
+                uiObject.name = objectName;
+            }
+        }
+
+        if (uiObject == null)
+        {
+            uiObject = new GameObject(objectName);
+        }
+
+        uiObject.transform.SetParent(parent, true);
+        uiObject.transform.localScale = Vector3.one;
+        UIDocument document = GetOrAdd<UIDocument>(uiObject);
+        document.panelSettings = panelSettings;
+        document.visualTreeAsset = visualTreeAsset;
+
+        LOTOYawFollowUI tagAlong = GetOrAdd<LOTOYawFollowUI>(uiObject);
+        tagAlong.headCamera = headCamera;
+        tagAlong.headSpaceOffset = headSpaceOffset;
+        tagAlong.yawOffsetDegrees = yawOffsetDegrees;
+        tagAlong.positionFollowSpeed = 3.5f;
+        tagAlong.yawFollowSpeed = 3.5f;
+        tagAlong.yawDeadZoneDegrees = 4f;
+        tagAlong.followPosition = true;
+        tagAlong.followYaw = true;
+        tagAlong.snapOnEnable = true;
+
+        EditorUtility.SetDirty(document);
+        EditorUtility.SetDirty(tagAlong);
+        EditorUtility.SetDirty(uiObject);
+        return document;
+    }
+
+    private static void SetInitialToolkitDocumentState(UIDocument document, bool enabled)
+    {
+        if (document == null)
+        {
+            return;
+        }
+
+        document.enabled = enabled;
+        EditorUtility.SetDirty(document);
+    }
+
+    private static Transform ResolveHeadCameraTransform()
+    {
+        GameObject cameraRig = GameObject.Find("OVRCameraRig");
+        Camera centerEyeCamera = cameraRig != null ? FindCenterEyeCamera(cameraRig) : Camera.main;
+        return centerEyeCamera != null ? centerEyeCamera.transform : null;
+    }
+
     private static void ConfigureFallbackControllerInput(GameObject cameraRig, bool enableFallback)
     {
         if (cameraRig == null)
@@ -387,6 +593,12 @@ public static class LOTOARSceneBuilder
         controllerInput.drawDebugRays = enableFallback;
         controllerInput.disableWhenMetaInteractionRigPresent = false;
         controllerInput.enableRayGrabSnapObjects = true;
+        controllerInput.enableToolkitUiInteraction = true;
+#if UNITY_2023_1_OR_NEWER
+        controllerInput.checklistUI = Object.FindFirstObjectByType<LOTOChecklistUI>(FindObjectsInactive.Include);
+#else
+        controllerInput.checklistUI = Object.FindObjectOfType<LOTOChecklistUI>(true);
+#endif
         controllerInput.enabled = enableFallback;
         EditorUtility.SetDirty(controllerInput);
     }

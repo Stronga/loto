@@ -14,6 +14,8 @@ public class LOTOXRControllerRayInput : MonoBehaviour
     public string metaInteractionRigName = "Controllers";
     public bool enableRayGrabSnapObjects = true;
     public float minimumGrabDistance = 0.25f;
+    public bool enableToolkitUiInteraction = true;
+    public LOTOChecklistUI checklistUI;
     public bool debugLogs = true;
     public bool drawDebugRays = true;
     public float debugRayLength = 10f;
@@ -34,9 +36,12 @@ public class LOTOXRControllerRayInput : MonoBehaviour
     private bool loggedMissingLeftOrigin;
     private bool loggedMissingRightDevice;
     private bool loggedMissingLeftDevice;
+    private bool loggedMissingChecklistUi;
     private bool loggedRayVisualActive;
     private Collider lastRayHitCollider;
     private bool lastRayHitWasUseful;
+    private string lastUiHitName;
+    private bool lastUiHitWasActionable;
     private LOTOSnapObject grabbedSnapObject;
     private Transform grabbedRayOrigin;
     private float grabbedDistance;
@@ -54,6 +59,7 @@ public class LOTOXRControllerRayInput : MonoBehaviour
 #endif
         }
 
+        ResolveChecklistUi();
         EnsureRayLine();
     }
 
@@ -132,6 +138,12 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         {
             Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
             Log($"LOTOXRControllerRayInput {controllerName} trigger pressed.");
+
+            if (TryTriggerToolkitUi(ray, controllerName))
+            {
+                wasPressed = isPressed;
+                return;
+            }
 
             if (TryBeginSnapObjectGrab(rayOrigin, ray, controllerName))
             {
@@ -253,6 +265,44 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool TryTriggerToolkitUi(Ray ray, string controllerName)
+    {
+        if (!enableToolkitUiInteraction)
+        {
+            return false;
+        }
+
+        LOTOChecklistUI ui = ResolveChecklistUi();
+        if (ui == null)
+        {
+            LogOnce(ref loggedMissingChecklistUi, "LOTOXRControllerRayInput has no LOTOChecklistUI assigned for UI ray interaction.");
+            return false;
+        }
+
+        bool didTrigger = ui.TryTriggerToolkitAtRay(ray, rayLength, out Vector3 hitPoint, out float distance, out string targetName);
+        if (didTrigger)
+        {
+            Log($"LOTOXRControllerRayInput {controllerName} UI trigger selected '{targetName}' at distance {distance:0.00}.");
+        }
+
+        return didTrigger;
+    }
+
+    private LOTOChecklistUI ResolveChecklistUi()
+    {
+        if (checklistUI != null)
+        {
+            return checklistUI;
+        }
+
+#if UNITY_2023_1_OR_NEWER
+        checklistUI = FindFirstObjectByType<LOTOChecklistUI>(FindObjectsInactive.Include);
+#else
+        checklistUI = FindObjectOfType<LOTOChecklistUI>(true);
+#endif
+        return checklistUI;
     }
 
     private static bool IsCurrentSnapAction(LOTOSnapObject snapObject)
@@ -437,6 +487,7 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         }
 
         Ray ray = new Ray(rayOrigin.position, rayOrigin.forward);
+        bool hasUiHit = TryGetToolkitUiHit(ray, out Vector3 uiHitPoint, out float uiHitDistance, out string uiHitName, out bool uiHitActionable);
         RaycastHit[] hits = Physics.RaycastAll(
             ray,
             rayLength,
@@ -447,6 +498,14 @@ public class LOTOXRControllerRayInput : MonoBehaviour
         {
             System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
             RaycastHit hit = hits[0];
+            if (hasUiHit && uiHitDistance <= hit.distance)
+            {
+                DrawRay(ray.origin, uiHitPoint, uiHitActionable ? hitColor : missColor);
+                UpdateReticle(uiHitPoint, true);
+                LogUiVisualHit(uiHitName, uiHitDistance, uiHitActionable);
+                return;
+            }
+
             bool usefulHit = IsLOTOInteraction(hit.collider);
 
             DrawRay(ray.origin, hit.point, usefulHit ? hitColor : missColor);
@@ -455,9 +514,33 @@ public class LOTOXRControllerRayInput : MonoBehaviour
             return;
         }
 
+        if (hasUiHit)
+        {
+            DrawRay(ray.origin, uiHitPoint, uiHitActionable ? hitColor : missColor);
+            UpdateReticle(uiHitPoint, true);
+            LogUiVisualHit(uiHitName, uiHitDistance, uiHitActionable);
+            return;
+        }
+
         DrawRay(ray.origin, ray.origin + ray.direction * rayLength, normalColor);
         UpdateReticle(Vector3.zero, false);
         LogVisualMiss();
+    }
+
+    private bool TryGetToolkitUiHit(Ray ray, out Vector3 hitPoint, out float hitDistance, out string targetName, out bool actionable)
+    {
+        hitPoint = Vector3.zero;
+        hitDistance = 0f;
+        targetName = string.Empty;
+        actionable = false;
+
+        if (!enableToolkitUiInteraction)
+        {
+            return false;
+        }
+
+        LOTOChecklistUI ui = ResolveChecklistUi();
+        return ui != null && ui.TryGetToolkitRayHit(ray, rayLength, out hitPoint, out hitDistance, out targetName, out actionable);
     }
 
     private static bool IsLOTOInteraction(Collider collider)
@@ -544,25 +627,42 @@ public class LOTOXRControllerRayInput : MonoBehaviour
 
     private void LogVisualHit(RaycastHit hit, bool usefulHit)
     {
-        if (hit.collider == lastRayHitCollider && usefulHit == lastRayHitWasUseful)
+        if (hit.collider == lastRayHitCollider && usefulHit == lastRayHitWasUseful && string.IsNullOrEmpty(lastUiHitName))
         {
             return;
         }
 
         lastRayHitCollider = hit.collider;
         lastRayHitWasUseful = usefulHit;
+        lastUiHitName = string.Empty;
         Log($"LOTOXRControllerRayInput ray hit '{hit.collider.name}' at distance {hit.distance:0.00}. Useful LOTO target: {usefulHit}.");
     }
 
-    private void LogVisualMiss()
+    private void LogUiVisualHit(string targetName, float distance, bool actionable)
     {
-        if (lastRayHitCollider == null)
+        if (targetName == lastUiHitName && actionable == lastUiHitWasActionable)
         {
             return;
         }
 
         lastRayHitCollider = null;
         lastRayHitWasUseful = false;
+        lastUiHitName = targetName;
+        lastUiHitWasActionable = actionable;
+        Log($"LOTOXRControllerRayInput ray hit UI '{targetName}' at distance {distance:0.00}. Actionable UI target: {actionable}.");
+    }
+
+    private void LogVisualMiss()
+    {
+        if (lastRayHitCollider == null && string.IsNullOrEmpty(lastUiHitName))
+        {
+            return;
+        }
+
+        lastRayHitCollider = null;
+        lastRayHitWasUseful = false;
+        lastUiHitName = string.Empty;
+        lastUiHitWasActionable = false;
         Log("LOTOXRControllerRayInput ray hit nothing useful.");
     }
 

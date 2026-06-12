@@ -22,6 +22,7 @@ public class LOTOWarningFeedback : MonoBehaviour
 
     private Coroutine warningRoutine;
     private bool originalLightState;
+    private VisualElement cachedToolkitRoot;
     private VisualElement toolkitWarningPanel;
     private Label toolkitWarningLabel;
 
@@ -104,6 +105,23 @@ public class LOTOWarningFeedback : MonoBehaviour
         if (uiDocument == null || uiDocument.rootVisualElement == null)
         {
             return;
+        }
+
+        if (cachedToolkitRoot != uiDocument.rootVisualElement)
+        {
+            cachedToolkitRoot = uiDocument.rootVisualElement;
+            toolkitWarningPanel = null;
+            toolkitWarningLabel = null;
+        }
+
+        if (toolkitWarningPanel != null && toolkitWarningPanel.panel == null)
+        {
+            toolkitWarningPanel = null;
+        }
+
+        if (toolkitWarningLabel != null && toolkitWarningLabel.panel == null)
+        {
+            toolkitWarningLabel = null;
         }
 
         if (toolkitWarningPanel == null && !string.IsNullOrWhiteSpace(warningPanelElement))

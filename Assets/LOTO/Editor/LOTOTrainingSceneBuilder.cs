@@ -11,12 +11,17 @@ public static class LOTOTrainingSceneBuilder
 {
     private const string GeneratorAssetPath = "Assets/FBX_inports/generator_unity_ar_ready.fbx";
     private const string ScenePath = "Assets/Scenes/loto.unity";
+    private const string GeneratedScenePath = "Assets/Scenes/LOTO_Generator_Training.generated.unity";
     private const string AnimationFolder = "Assets/LOTO/Animation";
     private const string MaterialFolder = "Assets/LOTO/Materials";
     private const string UiFolder = "Assets/LOTO/UI";
     private const string ControllerPath = AnimationFolder + "/Generator_LOTO.controller";
     private const string HudUxmlPath = UiFolder + "/LOTOTrainingHUD.uxml";
     private const string HudUssPath = UiFolder + "/LOTOTrainingHUD.uss";
+    private const string IntroUxmlPath = UiFolder + "/introUI.uxml";
+    private const string ChecklistUxmlPath = UiFolder + "/lotonewui.uxml";
+    private const string SuccessUxmlPath = UiFolder + "/sucessui.uxml";
+    private const string ChecklistUssPath = UiFolder + "/lotonewuiuss.uss";
     private const string HudPanelSettingsPath = UiFolder + "/LOTO_HUD_PanelSettings.asset";
 
     private static readonly string[] BaseLayerClips =
@@ -40,7 +45,15 @@ public static class LOTOTrainingSceneBuilder
         Material padlockMaterial = CreateMaterial("LOTO_Padlock_Red", new Color(0.74f, 0.05f, 0.03f, 1f));
         Material tagMaterial = CreateMaterial("LOTO_Tag_White", new Color(1f, 0.96f, 0.72f, 1f));
 
-        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        Scene previousActiveScene = SceneManager.GetActiveScene();
+        Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+        SceneManager.SetActiveScene(scene);
+        string generatedScenePath = AssetDatabase.GenerateUniqueAssetPath(GeneratedScenePath);
+        SceneAsset generatedSceneAsset = null;
+        bool savedGeneratedScene = false;
+
+        try
+        {
 
         GameObject cameraObject = CreateCamera();
         EnsureSceneInput(cameraObject);
@@ -131,11 +144,31 @@ public static class LOTOTrainingSceneBuilder
         CreateUIDocumentUi(uiRoot.transform, checklistUI, warningFeedback);
         CreateLighting();
 
-        EditorSceneManager.SaveScene(scene, ScenePath);
-        AddSceneToBuildSettings(ScenePath);
-        Selection.activeObject = managerObject;
+        EditorSceneManager.SaveScene(scene, generatedScenePath);
+        AddSceneToBuildSettings(generatedScenePath);
+        generatedSceneAsset = AssetDatabase.LoadAssetAtPath<SceneAsset>(generatedScenePath);
+        savedGeneratedScene = true;
 
-        Debug.Log($"Created LOTO training scene at {ScenePath}. Adjust click target positions to match the generator model before final testing.");
+        Debug.Log($"Created generated LOTO training scene at {generatedScenePath}. The open working scene was left untouched.");
+        }
+        finally
+        {
+            if (previousActiveScene.IsValid() && previousActiveScene.isLoaded)
+            {
+                SceneManager.SetActiveScene(previousActiveScene);
+            }
+
+            if (savedGeneratedScene && scene.IsValid() && scene.isLoaded)
+            {
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        if (generatedSceneAsset != null)
+        {
+            Selection.activeObject = generatedSceneAsset;
+            EditorGUIUtility.PingObject(generatedSceneAsset);
+        }
     }
 
     [MenuItem("LOTO/Setup loto Scene")]
@@ -685,8 +718,19 @@ public static class LOTOTrainingSceneBuilder
         LOTOWarningFeedback warningFeedback)
     {
         PanelSettings panelSettings = GetOrCreatePanelSettings();
-        VisualTreeAsset visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(HudUxmlPath);
-        StyleSheet styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(HudUssPath);
+        VisualTreeAsset introVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(IntroUxmlPath);
+        VisualTreeAsset checklistVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(ChecklistUxmlPath);
+        VisualTreeAsset successVisualTree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(SuccessUxmlPath);
+        VisualTreeAsset visualTreeAsset = introVisualTree != null
+            ? introVisualTree
+            : checklistVisualTree != null
+                ? checklistVisualTree
+                : AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(HudUxmlPath);
+        StyleSheet styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(ChecklistUssPath);
+        if (styleSheet == null)
+        {
+            styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(HudUssPath);
+        }
 
         if (visualTreeAsset == null)
         {
@@ -710,6 +754,11 @@ public static class LOTOTrainingSceneBuilder
 
         checklistUI.uiDocument = uiDocument;
         checklistUI.styleSheet = styleSheet;
+        checklistUI.introVisualTree = introVisualTree;
+        checklistUI.checklistVisualTree = checklistVisualTree != null ? checklistVisualTree : visualTreeAsset;
+        checklistUI.successVisualTree = successVisualTree;
+        checklistUI.showIntroOnStart = introVisualTree != null;
+        checklistUI.lockInputUntilStarted = introVisualTree != null;
         warningFeedback.uiDocument = uiDocument;
         warningFeedback.warningPanel = null;
         warningFeedback.warningText = null;

@@ -47,9 +47,7 @@
         "dependencies": [
           {
             "name": "AnimationClip",
-            "scenes": [
-              "Assets/Scenes/LOTO_AR.unity"
-            ],
+            "scenes": [],
             "dependencyType": 0,
             "icon": null
           },
@@ -84,7 +82,7 @@
           {
             "name": "Motion",
             "scenes": [],
-            "dependencyType": 1,
+            "dependencyType": 0,
             "icon": null
           },
           {

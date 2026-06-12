@@ -73,6 +73,11 @@ public class LOTOSnapObject : MonoBehaviour
             return;
         }
 
+        if (stateController != null && stateController.InputLocked)
+        {
+            return;
+        }
+
         if (!CanSnapNow())
         {
             return;

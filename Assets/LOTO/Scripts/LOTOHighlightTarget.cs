@@ -1,12 +1,16 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class LOTOHighlightTarget : MonoBehaviour
 {
     public Material highlightMaterial;
     public Renderer[] targetRenderers;
+    [Range(0.05f, 1f)]
+    public float highlightAlpha = 0.45f;
 
     private Material[][] originalMaterials;
     private bool[] originalEnabledStates;
+    private Material runtimeHighlightMaterial;
     private bool initialized;
 
     private void Awake()
@@ -38,7 +42,7 @@ public class LOTOHighlightTarget : MonoBehaviour
                 Material[] highlightedMaterials = new Material[targetRenderer.sharedMaterials.Length];
                 for (int j = 0; j < highlightedMaterials.Length; j++)
                 {
-                    highlightedMaterials[j] = highlightMaterial;
+                    highlightedMaterials[j] = GetHighlightMaterial();
                 }
 
                 targetRenderer.sharedMaterials = highlightedMaterials;
@@ -75,5 +79,56 @@ public class LOTOHighlightTarget : MonoBehaviour
         }
 
         initialized = true;
+    }
+
+    private Material GetHighlightMaterial()
+    {
+        if (highlightAlpha >= 0.999f)
+        {
+            return highlightMaterial;
+        }
+
+        if (runtimeHighlightMaterial == null)
+        {
+            runtimeHighlightMaterial = new Material(highlightMaterial);
+            runtimeHighlightMaterial.name = highlightMaterial.name + "_Transparent_Runtime";
+            ConfigureTransparentMaterial(runtimeHighlightMaterial, highlightAlpha);
+        }
+
+        return runtimeHighlightMaterial;
+    }
+
+    private static void ConfigureTransparentMaterial(Material material, float alpha)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            Color color = material.GetColor("_BaseColor");
+            color.a = alpha;
+            material.SetColor("_BaseColor", color);
+        }
+        else if (material.HasProperty("_Color"))
+        {
+            Color color = material.GetColor("_Color");
+            color.a = alpha;
+            material.SetColor("_Color", color);
+        }
+
+        if (material.HasProperty("_Surface"))
+        {
+            material.SetFloat("_Surface", 1f);
+        }
+
+        material.SetOverrideTag("RenderType", "Transparent");
+        material.SetInt("_SrcBlend", (int)BlendMode.SrcAlpha);
+        material.SetInt("_DstBlend", (int)BlendMode.OneMinusSrcAlpha);
+        material.SetInt("_ZWrite", 0);
+        material.renderQueue = (int)RenderQueue.Transparent;
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.EnableKeyword("_ALPHABLEND_ON");
     }
 }

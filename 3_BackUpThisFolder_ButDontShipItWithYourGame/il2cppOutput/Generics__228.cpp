@@ -14199,7 +14199,7 @@ IL_013b:
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #endif
-// Method Definition Index: 29393
+// Method Definition Index: 29400
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void StackScope_1__ctor_mB5878954E782DE87BB4C30D92E66F23988D6BC86_gshared (StackScope_1_tB82A0C5F6E33138F56988FA681174EF82C9ADB26* __this, Stack_1_tF3E5E7101E929741300A1CF7C159A6ED9B61621A** ___0_stack, const RuntimeMethod* method) 
 {
 	Stack_1_tF3E5E7101E929741300A1CF7C159A6ED9B61621A* V_0 = NULL;
@@ -14225,7 +14225,7 @@ IL2CPP_EXTERN_C  void StackScope_1__ctor_mB5878954E782DE87BB4C30D92E66F23988D6BC
 	_thisAdjusted = reinterpret_cast<StackScope_1_tB82A0C5F6E33138F56988FA681174EF82C9ADB26*>(__this + _offset);
 	StackScope_1__ctor_mB5878954E782DE87BB4C30D92E66F23988D6BC86(_thisAdjusted, ___0_stack, method);
 }
-// Method Definition Index: 29394
+// Method Definition Index: 29401
 IL2CPP_EXTERN_C IL2CPP_METHOD_ATTR void StackScope_1_Dispose_m23CF13EF100AC68D65C505ECE7714FF44A2B4248_gshared (StackScope_1_tB82A0C5F6E33138F56988FA681174EF82C9ADB26* __this, const RuntimeMethod* method) 
 {
 	{
